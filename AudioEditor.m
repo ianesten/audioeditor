@@ -356,6 +356,21 @@ classdef AudioEditor < handle
                  'AudioEditor:cantFindReader');
       end
     end
+    
+    function overrideStandardToolbarButtonCallback(this, audiotb, tag, callback)
+
+        tth = findall(this.FigureHandle, 'Type', 'uitoolbar');
+        ttb = findall(tth, 'Type', 'uipushtool');
+        % Set callback for overridden button
+        fo = findobj(ttb, 'Tag', tag);
+        button_data = get(fo);
+        %delete old button
+        delete(fo);
+        %create new one
+        fo = uipushtool(audiotb);
+        fo.ClickedCallback = callback;
+        fo.CData = button_data.CData;
+    end
 
     function createToolbar(this)
       audiotb = uitoolbar(this.FigureHandle);
@@ -365,15 +380,9 @@ classdef AudioEditor < handle
       ttb = findall(tth, 'Type', 'uipushtool');
 
       % Set callback for file open button
-      fo = findobj(ttb, 'Tag', 'Standard.FileOpen');
-      set(fo, 'Separator', 'on', 'ClickedCallback', ...
-              @(hobj, evd) fileOpenCallback(this));
-      copyobj(fo, audiotb);
-
-      % copy standard buttons to our toolbar
-      fo = findobj(ttb, 'Tag', 'Standard.SaveFigure');
-      set(fo, 'ClickedCallback', @(hobj, evd) fileWriteCallback(this));
-      copyobj(fo, audiotb);
+      overrideStandardToolbarButtonCallback(this, audiotb, 'Standard.FileOpen', @(hobj, evd) fileOpenCallback(this));
+      %And save
+      overrideStandardToolbarButtonCallback(this, audiotb, 'Standard.SaveFigure', @(hobj, evd) fileWriteCallback(this));
 
       copyobj(findobj(ttb, 'Tag', 'Standard.PrintFigure'), audiotb);
 
