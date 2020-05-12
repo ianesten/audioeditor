@@ -22,14 +22,14 @@ classdef ReadWaveFile < handle
 
     function data = getData(this)
         try
-            data = wavread(this.Filename);
+            data = audioread(this.Filename);
         catch ME
             rethrow(ME);
         end
     end
 
     function Fs = getSampleRate(this)
-        [data, Fs] = wavread(this.Filename, 1);
+        [~, Fs] = audioread(this.Filename);
     end
   end
 

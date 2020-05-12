@@ -113,6 +113,7 @@ classdef AudioEditor < handle
     FileFilterSpec = {}; % Spec used to filter files for uigetfile
     SelectorLines        % The lines used to select audio data in the editor
     SelectorPatchHandle  % Highlighting the area which is selected
+    SelectorRange
     RecentFiles = {};    % Most recently used files
     RecentFilesMenu      % Handle to most recent used files menu
     AudioPlayer          % audioplayer object.
@@ -135,6 +136,30 @@ classdef AudioEditor < handle
       this.UndoDataManager = UndoManager;
       createFigure(this);
     end
+    
+    % Return the points where the selector lines are.
+    % The first point is always smaller.
+    function [xd1, xd2] = getSelectionPoints(this)
+      xd1 = get(this.SelectorLines(1), 'XData');
+      xd2 = get(this.SelectorLines(2), 'XData');
+      if xd1(1) > xd2(1) % Make xd1 the smaller
+        temp = xd1;
+        xd1 = xd2;
+        xd2 = temp;
+      end
+    end
+
+    function [xd1, xd2] = getSelectionSampleNumbers(this)
+      [xd1, xd2] = getSelectionPoints(this);
+      xd1 = floor(xd1*this.Fs);
+      xd2 = floor(xd2*this.Fs);
+    end
+    
+    function y = getSelectedAudio(this)
+        [xd1, xd2] = getSelectionSampleNumbers(this);
+        y = this.AudioData(xd1(1):xd2(1), :);
+    end
+
   end
 
   methods (Access = 'private')
@@ -356,9 +381,13 @@ classdef AudioEditor < handle
       copyobj(findobj(ttb, 'Tag', 'Exploration.ZoomIn'), audiotb);
       copyobj(findobj(ttb, 'Tag', 'Exploration.ZoomOut'), audiotb);
       copyobj(findobj(ttb, 'Tag', 'Exploration.DataCursor'), audiotb);
+      
+      %find location of icons directory
+      functionPath = mfilename('fullpath')
+      functionDirectory = fileparts(functionPath)
 
       % Add zoom to selection button
-      [cd,m,alpha] = imread('icons/ae_zoom_select.png');
+      [cd,m,alpha] = imread(fullfile(functionDirectory, 'icons/ae_zoom_select.png'));
       cd = double(cd) / 255;
       cd(~alpha) = NaN;
       uipushtool(audiotb, 'CData', cd, ...
@@ -367,7 +396,7 @@ classdef AudioEditor < handle
            'ClickedCallback', @(hobj, evd) zoomSelectionCallback(this));
 
       % Add zoom out back to full signal button
-      [cd,m,alpha] = imread('icons/ae_zoom_outfull.png');
+      [cd,m,alpha] = imread(fullfile(functionDirectory, 'icons/ae_zoom_outfull.png'));
       cd = double(cd) / 255;
       cd(~alpha) = NaN;
       uipushtool(audiotb, 'CData', cd, ...
@@ -485,7 +514,7 @@ classdef AudioEditor < handle
     % Add audio play back controls.
     function addPlaybackControls(this, parent)
       % Add playback controls
-      load audiotoolbaricons;
+      load uiscope_icons;
       uipushtool(parent, 'CData', play_on,...
                    'TooltipString', 'Play',...
                    'HandleVisibility','off',...
@@ -517,24 +546,6 @@ classdef AudioEditor < handle
                                   'HitTest', 'off', ...
                                   'Parent', this.AxesHandles(i));
       end
-    end
-
-    % Return the points where the selector lines are.
-    % The first point is always smaller.
-    function [xd1, xd2] = getSelectionPoints(this)
-      xd1 = get(this.SelectorLines(1), 'XData');
-      xd2 = get(this.SelectorLines(2), 'XData');
-      if xd1(1) > xd2(1) % Make xd1 the smaller
-        temp = xd1;
-        xd1 = xd2;
-        xd2 = temp;
-      end
-    end
-
-    function [xd1, xd2] = getSelectionSampleNumbers(this)
-      [xd1, xd2] = getSelectionPoints(this);
-      xd1 = floor(xd1*this.Fs);
-      xd2 = floor(xd2*this.Fs);
     end
 
     function stopAudioPlayer(this)
