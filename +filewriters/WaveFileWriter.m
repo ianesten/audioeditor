@@ -14,7 +14,7 @@ classdef WaveFileWriter < handle
       end
 
       function write(fileName, data, Fs)
-          audiowrite(data, Fs, fileName);
+          audiowrite(fileName, data, Fs);
       end
   end
 
