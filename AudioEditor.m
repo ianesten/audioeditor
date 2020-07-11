@@ -131,15 +131,22 @@ classdef AudioEditor < handle
     end
     
     methods
-        function this = AudioEditor(filename)
-            if(nargin >= 1)
-                this.Filename = filename;
+        function this = AudioEditor(inputAudio, inputAudioFs)
+            if(nargin == 1)
+                this.Filename = inputAudio;
             end
-            addpath(fileparts(mfilename('fullpath')));
+            if(nargin <= 1)
+                addpath(fileparts(mfilename('fullpath')));
+            end
+            if(nargin == 2)
+                this.Filename = ' ';
+                this.AudioData = inputAudio;
+                this.Fs = inputAudioFs;
+            end
             this.UndoDataManager = UndoManager;
             createFigure(this);
         end
-        
+                
         % Return the points where the selector lines are.
         % The first point is always smaller.
         function [xd1, xd2] = getSelectionPoints(this)
@@ -284,7 +291,13 @@ classdef AudioEditor < handle
         end
         
         function loadAudioFile(this, filename)
-            [data, Fs, errFlag] = readAudioFile(this, filename);
+            if(isfile(filename))
+                [data, Fs, errFlag] = readAudioFile(this, filename);
+            else
+                data = this.AudioData;
+                Fs = this.Fs;
+                errFlag = 0;
+            end
             if ~errFlag
                 this.Filename = filename;
                 plotData(this, data, Fs);
