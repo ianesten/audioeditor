@@ -264,12 +264,12 @@ classdef AudioEditor < handle
                 for i=1:len
                     idxi = unique([idx; this.iOutliers(ol & this.jOutliers == i)]);
                     set(this.ChannelHandles(i), 'XData', idxi/this.Fs, ...
-                        'YData', this.AudioData(idxi));
+                        'YData', this.AudioData(idxi, i));
                 end
             else
                 for i=1:len
                     set(this.ChannelHandles(i), 'XData', id/this.Fs, ...
-                        'YData', this.AudioData(id));
+                        'YData', this.AudioData(id, i));
                 end
             end
         end

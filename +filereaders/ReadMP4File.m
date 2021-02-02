@@ -23,9 +23,9 @@ classdef ReadMP4File < handle
         end
 
         function setFilename(this, filename)
-            if(which('ffmpegextract'))
-                ffmpegextract(filename, this.tempFilename, 'audio');
-            end
+%             if(which('ffmpegextract'))
+%                 ffmpegextract(filename, this.tempFilename, 'audio');
+%             end
             this.Filename = filename;
         end
 
