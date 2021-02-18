@@ -109,6 +109,7 @@ classdef AudioEditor < handle
         muteState = []
         soloState = []
         gains = []
+        channelMixingMatrix  % how to go from N to 2 channels
         ButtonSize = 16;
         Filename = which('speech_dft.wav');
         AudioData            % Audio data being edited
@@ -313,6 +314,47 @@ classdef AudioEditor < handle
                 this.Filename = filename;
                 plotData(this, data, Fs);
                 addToRecentFiles(this, this.Filename);
+                this.createChannelMixingMatrix();
+            end
+        end
+        
+        function createChannelMixingMatrix(this)
+            numInputChannels = size(this.AudioData, 2);
+            numOutputChannels = 2;
+            if(numInputChannels == numOutputChannels)
+                % while numOutputChannels is still 2, this is stereo
+                this.channelMixingMatrix = eye(numInputChannels);
+            elseif(1 == numInputChannels)
+                % mono in
+                this.channelMixingMatrix = ones(numInputChannels, numOutputChannels);
+            else
+                this.channelMixingMatrix = zeros(numInputChannels, numOutputChannels);
+                % now we start guessing...
+                if(6 == numInputChannels)
+                    % guessing 5.1, L C R Ls Rs LFE (Film order)
+                    this.channelMixingMatrix(1, 1) = 1;
+                    this.channelMixingMatrix(2, 1) = 1;
+                    this.channelMixingMatrix(2, 2) = 1;
+                    this.channelMixingMatrix(3, 2) = 1;
+                    this.channelMixingMatrix(4, 1) = 1;
+                    this.channelMixingMatrix(5, 2) = 1;
+                    this.channelMixingMatrix(6, 1) = 1;
+                    this.channelMixingMatrix(6, 2) = 1;
+                elseif(8 == numInputChannels)
+                    % guessing 7.1, L C R Lss Rss Lsr Rsr LFE (Film order)
+                    this.channelMixingMatrix(1, 1) = 1;
+                    this.channelMixingMatrix(2, 1) = 1;
+                    this.channelMixingMatrix(2, 2) = 1;
+                    this.channelMixingMatrix(3, 2) = 1;
+                    this.channelMixingMatrix(4, 1) = 1;
+                    this.channelMixingMatrix(5, 2) = 1;
+                    this.channelMixingMatrix(6, 1) = 1;
+                    this.channelMixingMatrix(7, 2) = 1;
+                    this.channelMixingMatrix(8, 1) = 1;
+                    this.channelMixingMatrix(8, 2) = 1;
+                else
+                    % don't know, assume first two channels are L & R
+                end
             end
         end
         
@@ -758,7 +800,7 @@ classdef AudioEditor < handle
                 hl(i) = line([xd1(1) xd1(1)]/this.Fs, [-1 1], 'Color', [1 0 0], ...
                     'Parent', this.AxesHandles(i));
             end
-            this.AudioPlayer = audioplayer(this.AudioData(xd1(1)+1:xd2(1), :) .* this.gains, this.Fs);
+            this.AudioPlayer = audioplayer(this.AudioData(xd1(1)+1:xd2(1), :) .* this.gains * this.channelMixingMatrix, this.Fs);
             set(this.AudioPlayer, 'TimerPeriod', 0.05, 'UserData', hl, ...
                 'TimerFcn', @(ap, evd) audioPlayerCallbackTimer(this, ap, hl, xd1(1)), ...
                 'StopFcn',  @(ap, evd) audioPlayerCallbackStop(this, ap, hl));
