@@ -104,6 +104,12 @@ classdef AudioEditor < handle
         FigureHandle         % Handle to main figure window
         AxesHandles          % Handles to each axes. Each channel is in one axis
         ChannelHandles       % Handles to each channel's line plots
+        MuteButtons
+        SoloButtons
+        muteState = []
+        soloState = []
+        gains = []
+        ButtonSize = 16;
         Filename = which('speech_dft.wav');
         AudioData            % Audio data being edited
         iOutliers            % Used for down sampled plot
@@ -246,6 +252,11 @@ classdef AudioEditor < handle
         function clearHandles(this)
             this.AxesHandles = [];
             this.ChannelHandles = [];
+            this.MuteButtons = [];
+            this.SoloButtons = [];
+            this.muteState = [];
+            this.soloState = [];
+            this.gains = [];
             this.SelectorLines = [];
             this.SelectorPatchHandle = [];
             this.UndoDataManager.clearUndoData();
@@ -305,6 +316,34 @@ classdef AudioEditor < handle
             end
         end
         
+        function muteCallback(this, buttonIndex, hObject, eventdata)
+            value = eventdata.Source.Value;
+            this.muteState(buttonIndex) = value;
+            if(1 == value)
+                this.soloState(buttonIndex) = 1 - value;
+            end
+            this.updateMuteSoloButtons();
+        end
+        
+        function soloCallback(this, buttonIndex, hObject, eventdata)
+            value = eventdata.Source.Value;
+            this.soloState(buttonIndex) = value;
+            this.muteState(setdiff(1:length(this.soloState), buttonIndex)) = value;
+            if(1 == value)
+                this.muteState(buttonIndex) = 1 - value;
+            end
+
+            this.updateMuteSoloButtons();
+        end
+        
+        function updateMuteSoloButtons(this)
+            for i = 1:length(this.MuteButtons)
+                this.MuteButtons(i).Value = this.muteState(i);
+                this.SoloButtons(i).Value = this.soloState(i);
+                this.gains(i) = 1 - this.muteState(i);
+            end
+        end
+        
         % Plot audio data.
         function plotData(this, data, Fs)
             this.AudioData = data;
@@ -312,8 +351,11 @@ classdef AudioEditor < handle
             sz = size(this.AudioData);
             clearHandles(this);
             set(this.FigureHandle, 'HandleVisibility', 'on');
+            this.MuteButtons = gobjects(sz(2), 1);
+            this.SoloButtons = gobjects(sz(2), 1);
             for i=1:sz(2)
-                subplot(sz(2), 1, i),
+                subplotHandle = subplot(sz(2), 1, i);
+                get(subplotHandle, 'position');
                 this.ChannelHandles(i) = plot(nan);   % Get a handle for plot
                 this.AxesHandles(i) = get(this.ChannelHandles(i), 'Parent');
                 set(this.AxesHandles(i), ...
@@ -322,6 +364,16 @@ classdef AudioEditor < handle
                 set(this.ChannelHandles(i), ...
                     'ButtonDownFcn', @(hobj, evd) axesButtonDownCallback(this));
                 axis([0 sz(1)/this.Fs -1 1]);
+                % add mute and solo buttons
+                muteColour = [1 0.6 0.6];
+                soloColour = [0.6 1 0.6];
+                mutecb = @(hObject, eventdata) this.muteCallback(i, hObject, eventdata);
+                solocb = @(hObject, eventdata) this.soloCallback(i, hObject, eventdata);
+                this.MuteButtons(i) = uicontrol('Parent', this.FigureHandle, 'Style', 'togglebutton', 'String', 'M', 'backgroundcolor', muteColour, 'Visible', 'on', 'Callback', mutecb);
+                this.SoloButtons(i) = uicontrol('Parent', this.FigureHandle, 'Style', 'togglebutton', 'String', 'S', 'backgroundcolor', soloColour, 'Visible', 'on', 'Callback', solocb);
+                this.muteState(i) = 0;
+                this.soloState(i) = 0;
+                this.gains(i) = 1;
                 zoom reset;     % Remember original zoom position
             end
             dsplot(this);
@@ -332,7 +384,7 @@ classdef AudioEditor < handle
             resizeFcnCallback(this);
             linkaxes(this.AxesHandles); % link axes for zooming
         end
-        
+                
         % Read audio data from given file.
         function [data, Fs, errFlag] = readAudioFile(this, filename)
             reader = findReader(this, filename);
@@ -408,8 +460,8 @@ classdef AudioEditor < handle
             copyobj(findobj(ttb, 'Tag', 'Exploration.DataCursor'), audiotb);
             
             %find location of icons directory
-            functionPath = mfilename('fullpath')
-            functionDirectory = fileparts(functionPath)
+            functionPath = mfilename('fullpath');
+            functionDirectory = fileparts(functionPath);
             
             % Add zoom to selection button
             [cd,m,alpha] = imread(fullfile(functionDirectory, 'icons/ae_zoom_select.png'));
@@ -622,6 +674,14 @@ classdef AudioEditor < handle
                     set(this.AxesHandles(len-i), 'XTick', []);
                 end
             end
+            % set mute/solo button positions
+            for i = 1:length(this.MuteButtons)
+                plotPosition = get(this.AxesHandles(i), 'position');
+                buttonPosition = [1, plotPosition(2) + plotPosition(4) - this.ButtonSize, this.ButtonSize, this.ButtonSize];
+                set(this.MuteButtons(i), 'position', buttonPosition);
+                buttonPosition(2) = buttonPosition(2) - this.ButtonSize;
+                set(this.SoloButtons(i), 'position', buttonPosition);
+            end
         end
         
         function fileOpenCallback(this)
@@ -683,6 +743,11 @@ classdef AudioEditor < handle
         % Play audio
         function playCallback(this)
             stopAudioPlayer(this);
+            % disable mute/solo buttons - can't change gain while playing
+            for i = 1:length(this.MuteButtons)
+                this.MuteButtons(i).Enable = 'off';
+                this.SoloButtons(i).Enable = 'off';
+            end
             [xd1, xd2] = getSelectionSampleNumbers(this);
             if xd1(1) == xd2(1)
                 xd2(1) = size(this.AudioData, 1);
@@ -693,7 +758,7 @@ classdef AudioEditor < handle
                 hl(i) = line([xd1(1) xd1(1)]/this.Fs, [-1 1], 'Color', [1 0 0], ...
                     'Parent', this.AxesHandles(i));
             end
-            this.AudioPlayer = audioplayer(this.AudioData(xd1(1)+1:xd2(1), :), this.Fs);
+            this.AudioPlayer = audioplayer(this.AudioData(xd1(1)+1:xd2(1), :) .* this.gains, this.Fs);
             set(this.AudioPlayer, 'TimerPeriod', 0.05, 'UserData', hl, ...
                 'TimerFcn', @(ap, evd) audioPlayerCallbackTimer(this, ap, hl, xd1(1)), ...
                 'StopFcn',  @(ap, evd) audioPlayerCallbackStop(this, ap, hl));
@@ -715,6 +780,11 @@ classdef AudioEditor < handle
         % Stop audio playback
         function stopCallback(this)
             stopAudioPlayer(this);
+            % re-enable mute/solo
+            for i = 1:length(this.MuteButtons)
+                this.MuteButtons(i).Enable = 'on';
+                this.SoloButtons(i).Enable = 'on';
+            end
         end
         
         % Position both selection lines at the mouse click point
