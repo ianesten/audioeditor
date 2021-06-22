@@ -8,3 +8,4 @@ Updates include:
 - saving to mat file supported
 - mute/solo
 - multichannel audio
+- transport info

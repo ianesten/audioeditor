@@ -106,6 +106,8 @@ classdef AudioEditor < handle
         ChannelHandles       % Handles to each channel's line plots
         MuteButtons
         SoloButtons
+        TransportSecondsText
+        TransportSamplesText
         muteState = []
         soloState = []
         gains = []
@@ -396,6 +398,12 @@ classdef AudioEditor < handle
             sz = size(this.AudioData);
             clearHandles(this);
             set(this.FigureHandle, 'HandleVisibility', 'on');
+            this.TransportSecondsText = uicontrol('Parent', this.FigureHandle, 'Style', 'edit', 'Visible', 'on', 'String', '0 s');
+            this.TransportSamplesText = uicontrol('Parent', this.FigureHandle, 'Style', 'edit', 'Visible', 'on', 'String', '0');
+            this.TransportSecondsText.Max = 1;
+            this.TransportSecondsText.Min = 1;
+            this.TransportSamplesText.Max = 1;
+            this.TransportSamplesText.Min = 1;
             this.MuteButtons = gobjects(sz(2), 1);
             this.SoloButtons = gobjects(sz(2), 1);
             for i=1:sz(2)
@@ -720,6 +728,7 @@ classdef AudioEditor < handle
                 end
             end
             % set mute/solo button positions
+            plotPosition = [];
             for i = 1:length(this.MuteButtons)
                 plotPosition = get(this.AxesHandles(i), 'position');
                 buttonPosition = [1, plotPosition(2) + plotPosition(4) - this.ButtonSize, this.ButtonSize, this.ButtonSize];
@@ -727,6 +736,13 @@ classdef AudioEditor < handle
                 buttonPosition(2) = buttonPosition(2) - this.ButtonSize;
                 set(this.SoloButtons(i), 'position', buttonPosition);
             end
+            textPosition = fPos;
+            textPosition(3) = 100;
+            textPosition(4) = 20;
+            textPosition(1:2) = 0;
+            set(this.TransportSecondsText, 'position', textPosition);
+            textPosition(1) = textPosition(1) + 101;
+            set(this.TransportSamplesText, 'position', textPosition);
         end
         
         function fileOpenCallback(this)
@@ -846,6 +862,8 @@ classdef AudioEditor < handle
                 hLine = this.SelectorLines(1,:);
                 set(this.FigureHandle, 'WindowButtonMotionFcn', ...
                     @(hobj, evd) selectLineDragCallback(this, hLine));
+                [xd1, xd2] = getSelectionSampleNumbers(this);
+                displayTransportTime(this, xd1(1));
             elseif strcmp(get(this.FigureHandle,'SelectionType'),'alt') % right click
                 xd1 = get(this.SelectorLines(1), 'XData');
                 xd2 = get(this.SelectorLines(2), 'XData');
@@ -893,6 +911,7 @@ classdef AudioEditor < handle
             len = size(this.AudioData, 1)/this.Fs;
             set(this.SelectorLines(2, :), 'XData', [len len]);
             set(this.SelectorPatchHandle, 'XData', [0 0 len len]);
+            displayTransportTime(this, 0);
         end
         
         % Stop selection drag
@@ -1051,6 +1070,12 @@ classdef AudioEditor < handle
             set(hl, 'XData', [x x]/this.Fs);
             data = getCurrentData(this, x, x);
             this.Analyzer.analyze(data, this.Fs);
+            displayTransportTime(this, x);
+        end
+
+        function displayTransportTime(this, sampleTime)
+            set(this.TransportSecondsText, 'string', string(sampleTime / this.Fs) + " s");
+            set(this.TransportSamplesText, 'string', string(sampleTime));
         end
         
         function audioPlayerCallbackStop(this, ap, hl) %#ok<INUSL>
