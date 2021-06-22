@@ -109,7 +109,6 @@ classdef AudioEditor < handle
         muteState = []
         soloState = []
         gains = []
-        channelMixingMatrix  % how to go from N to 2 channels
         ButtonSize = 16;
         Filename = which('speech_dft.wav');
         AudioData            % Audio data being edited
@@ -129,6 +128,10 @@ classdef AudioEditor < handle
         hFileWriterManager   % Object which manages all file writers
         UndoDataManager      % Manages undo and redo data
         Clipboard = ClipboardManager.getInstance; % Cut copy paste
+    end
+    
+    properties (SetAccess = 'public', GetAccess='public')
+        channelMixingMatrix  % how to go from N to 2 channels
     end
     
     properties (Constant = true, SetAccess = 'private', GetAccess='private')
