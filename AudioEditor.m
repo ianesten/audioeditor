@@ -178,6 +178,23 @@ classdef AudioEditor < handle
             xd1 = floor(xd1*this.Fs);
             xd2 = floor(xd2*this.Fs);
         end
+
+        function setSelectionSampleNumbers(this, xd1, xd2)
+            if((2 == nargin()) && (2 == length(xd1)))
+                xd2 = xd1(2);
+                xd1 = xd1(1);
+            end
+            if xd1 > xd2 % Make xd1 the smaller
+                temp = xd1;
+                xd1 = xd2;
+                xd2 = temp;
+            end
+            xd = [xd1 xd1 xd2 xd2] / this.Fs;
+            set(this.SelectorLines(1), 'XData', xd(1:2));
+            set(this.SelectorLines(2), 'XData', xd(3:4));
+            set(this.SelectorPatchHandle, 'XData', xd);
+            displayTransportTime(this, xd1);
+        end
         
         function y = getSelectedAudio(this)
             [xd1, xd2] = getSelectionSampleNumbers(this);
