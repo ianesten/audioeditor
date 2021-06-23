@@ -111,7 +111,6 @@ classdef AudioEditor < handle
         muteState = []
         soloState = []
         gains = []
-        ButtonSize = 16;
         Filename = which('speech_dft.wav');
         AudioData            % Audio data being edited
         iOutliers            % Used for down sampled plot
@@ -137,6 +136,7 @@ classdef AudioEditor < handle
     end
     
     properties (Constant = true, SetAccess = 'private', GetAccess='private')
+        ButtonSize = 16;
         MaxRecentFiles = 4;  % Maximum number of files in most recent files list
         PreferenceGroupName = 'AudioEditor_ApplicationPrefs';
         % group name for storing preferences
@@ -151,7 +151,7 @@ classdef AudioEditor < handle
                 addpath(fileparts(mfilename('fullpath')));
             end
             if(nargin == 2)
-                this.Filename = ' ';
+                this.Filename = inputname(1);
                 this.AudioData = inputAudio;
                 this.Fs = inputAudioFs;
             end
@@ -163,8 +163,10 @@ classdef AudioEditor < handle
         % The first point is always smaller.
         function [xd1, xd2] = getSelectionPoints(this)
             xd1 = get(this.SelectorLines(1), 'XData');
+            xd1 = xd1(1);
             xd2 = get(this.SelectorLines(2), 'XData');
-            if xd1(1) > xd2(1) % Make xd1 the smaller
+            xd2 = xd2(1);
+            if xd1 > xd2 % Make xd1 the smaller
                 temp = xd1;
                 xd1 = xd2;
                 xd2 = temp;
@@ -179,7 +181,7 @@ classdef AudioEditor < handle
         
         function y = getSelectedAudio(this)
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            y = this.AudioData(xd1(1):xd2(1), :);
+            y = this.AudioData(xd1:xd2, :);
         end
         
     end
@@ -810,18 +812,18 @@ classdef AudioEditor < handle
                 this.SoloButtons(i).Enable = 'off';
             end
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            if xd1(1) == xd2(1)
-                xd2(1) = size(this.AudioData, 1);
+            if xd1 == xd2
+                xd2 = size(this.AudioData, 1);
             end
             hl = zeros(length(this.AxesHandles), 1);
             for i=1:length(this.AxesHandles)
                 axes(this.AxesHandles(i)); % Make this current axis
-                hl(i) = line([xd1(1) xd1(1)]/this.Fs, [-1 1], 'Color', [1 0 0], ...
+                hl(i) = line([xd1 xd1]/this.Fs, [-1 1], 'Color', [1 0 0], ...
                     'Parent', this.AxesHandles(i));
             end
-            this.AudioPlayer = audioplayer(this.AudioData(xd1(1)+1:xd2(1), :) .* this.gains * this.channelMixingMatrix, this.Fs);
+            this.AudioPlayer = audioplayer(this.AudioData(xd1+1:xd2, :) .* this.gains * this.channelMixingMatrix, this.Fs);
             set(this.AudioPlayer, 'TimerPeriod', 0.05, 'UserData', hl, ...
-                'TimerFcn', @(ap, evd) audioPlayerCallbackTimer(this, ap, hl, xd1(1)), ...
+                'TimerFcn', @(ap, evd) audioPlayerCallbackTimer(this, ap, hl, xd1), ...
                 'StopFcn',  @(ap, evd) audioPlayerCallbackStop(this, ap, hl));
             play(this.AudioPlayer);
         end
@@ -863,17 +865,17 @@ classdef AudioEditor < handle
                 set(this.FigureHandle, 'WindowButtonMotionFcn', ...
                     @(hobj, evd) selectLineDragCallback(this, hLine));
                 [xd1, xd2] = getSelectionSampleNumbers(this);
-                displayTransportTime(this, xd1(1));
+                displayTransportTime(this, xd1);
             elseif strcmp(get(this.FigureHandle,'SelectionType'),'alt') % right click
                 xd1 = get(this.SelectorLines(1), 'XData');
                 xd2 = get(this.SelectorLines(2), 'XData');
                 % Find closest line and move that to this point
-                if abs(xd1(1)-cp(1)) < abs(xd2(1)-cp(1))
+                if abs(xd1-cp(1)) < abs(xd2-cp(1))
                     set(this.SelectorLines(1,:), 'XData', [cp(1) cp(1)]);
-                    set(this.SelectorPatchHandle, 'XData', [cp(1) cp(1) xd2(1) xd2(1)]);
+                    set(this.SelectorPatchHandle, 'XData', [cp(1) cp(1) xd2 xd2]);
                 else
                     set(this.SelectorLines(2,:), 'XData', [cp(1) cp(1)]);
-                    set(this.SelectorPatchHandle, 'XData', [xd1(1) xd1(1) cp(1) cp(1)]);
+                    set(this.SelectorPatchHandle, 'XData', [xd1 xd1 cp(1) cp(1)]);
                 end
             end
         end
@@ -918,39 +920,39 @@ classdef AudioEditor < handle
         function figureButtonUpCallback(this)
             set(this.FigureHandle, 'WindowButtonMotionFcn', '');
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            data = getCurrentData(this, xd1(1), xd2(1));
+            data = getCurrentData(this, xd1, xd2);
             this.Analyzer.analyze(data, this.Fs);
         end
         
         % cut
         function cutCallback(this)
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            this.Clipboard.Data = this.AudioData(xd1(1)+1:xd2(1), :);
-            this.AudioData(xd1(1)+1:xd2(1), :) = [];
+            this.Clipboard.Data = this.AudioData(xd1+1:xd2, :);
+            this.AudioData(xd1+1:xd2, :) = [];
             dsplot(this);
             this.UndoDataManager.pushData(this.Clipboard.Data, ...
-                [], xd1(1), xd2(1), xd1(1));
+                [], xd1, xd2, xd1);
             xd1 = xd1 / this.Fs;
             set(this.SelectorLines, 'XData', xd1);
-            set(this.SelectorPatchHandle, 'XData', [xd1(1) xd1(1) xd1(1) xd1(1)]);
+            set(this.SelectorPatchHandle, 'XData', [xd1 xd1 xd1 xd1]);
         end
         
         % copy
         function copyCallback(this)
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            this.Clipboard.Data = this.AudioData(xd1(1)+1:xd2(1), :);
+            this.Clipboard.Data = this.AudioData(xd1+1:xd2, :);
         end
         
         % paste
         function pasteCallback(this)
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            this.UndoDataManager.pushData(this.AudioData(xd1(1)+1:xd2(1), :), ...
+            this.UndoDataManager.pushData(this.AudioData(xd1+1:xd2, :), ...
                 this.Clipboard.Data, ...
-                xd1(1), xd2(1),...
-                xd1(1)+size(this.Clipboard.Data,1));
-            this.AudioData = [this.AudioData(1:xd1(1), :); ...
+                xd1, xd2,...
+                xd1+size(this.Clipboard.Data,1));
+            this.AudioData = [this.AudioData(1:xd1, :); ...
                 this.Clipboard.Data; ...
-                this.AudioData(xd2(1)+1:end, :)];
+                this.AudioData(xd2+1:end, :)];
             dsplot(this);
             xd1 = xd1 / this.Fs;
             xd2 = xd1 + size(this.Clipboard.Data, 1)/this.Fs;
@@ -959,28 +961,28 @@ classdef AudioEditor < handle
             else
                 set(this.SelectorLines(1,:), 'XData', xd2);
             end
-            set(this.SelectorPatchHandle, 'XData', [xd1(1) xd1(1) xd2(1) xd2(1)]);
+            set(this.SelectorPatchHandle, 'XData', [xd1 xd1 xd2 xd2]);
         end
         
         % paste add
         function pasteAddCallback(this, hobj)
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            xd2(1) = xd1(1) + size(this.Clipboard.Data, 1);
-            if xd2(1) > size(this.AudioData, 1)
-                xd2(1) = size(this.AudioData, 1);
+            xd2 = xd1 + size(this.Clipboard.Data, 1);
+            if xd2 > size(this.AudioData, 1)
+                xd2 = size(this.AudioData, 1);
             end
-            this.UndoDataManager.pushData(this.AudioData(xd1(1)+1:xd2(1), :), ...
+            this.UndoDataManager.pushData(this.AudioData(xd1+1:xd2, :), ...
                 this.Clipboard.Data, ...
-                xd1(1), xd2(1),...
-                xd1(1)+size(this.Clipboard.Data,1));
+                xd1, xd2,...
+                xd1+size(this.Clipboard.Data,1));
             if strcmp(get(hobj, 'Label'), 'Paste Add')
-                this.AudioData(xd1(1)+1:xd2(1), :) = ...
-                    this.AudioData(xd1(1)+1:xd2(1), :) +...
-                    this.Clipboard.Data(1:(xd2(1)-xd1(1)), :);
+                this.AudioData(xd1+1:xd2, :) = ...
+                    this.AudioData(xd1+1:xd2, :) +...
+                    this.Clipboard.Data(1:(xd2-xd1), :);
             else
-                this.AudioData(xd1(1)+1:xd2(1), :) = ...
-                    this.AudioData(xd1(1)+1:xd2(1), :) -...
-                    this.Clipboard.Data(1:(xd2(1)-xd1(1)), :);
+                this.AudioData(xd1+1:xd2, :) = ...
+                    this.AudioData(xd1+1:xd2, :) -...
+                    this.Clipboard.Data(1:(xd2-xd1), :);
             end
             dsplot(this);
         end
@@ -1019,9 +1021,9 @@ classdef AudioEditor < handle
         % Callback for fit selection to the axis button
         function zoomSelectionCallback(this)
             [xd1, xd2] = getSelectionPoints(this);
-            if xd1(1) ~= xd2(1)
-                updatePlot(this, [xd1(1) xd2(1)]);
-                set(this.AxesHandles, 'XLim', [xd1(1) xd2(1)]);
+            if xd1 ~= xd2
+                updatePlot(this, [xd1 xd2]);
+                set(this.AxesHandles, 'XLim', [xd1 xd2]);
             end
         end
         
@@ -1036,28 +1038,29 @@ classdef AudioEditor < handle
         function analyzerCallback(this, obj)
             aName = get(obj, 'Label');
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            data = getCurrentData(this, xd1(1), xd2(1));
+            data = getCurrentData(this, xd1, xd2);
             this.Analyzer.analyze(data, this.Fs, aName);
         end
         
         function filterCallback(this, obj)
             [xd1, xd2] = getSelectionSampleNumbers(this);
-            x1 = xd1(1); x2 = xd2(1);
+            x1 = xd1; x2 = xd2;
             if x1 ~= x2
                 % Send selected data to filter
                 y = this.hFilterManager.filter(get(obj, 'Label'), ...
                     this.AudioData(x1+1:x2, :), this.Fs);
-                this.UndoDataManager.pushData(this.AudioData(xd1(1)+1:xd2(1), :), ...
-                    y, xd1(1), xd2(1), xd1(1)+size(y,1));
+                this.UndoDataManager.pushData(this.AudioData(xd1+1:xd2, :), ...
+                    y, xd1, xd2, xd1+size(y,1));
                 % Insert received data
                 this.AudioData = [this.AudioData(1:x1,:); y; ...
                     this.AudioData(x2+1:end, :)];
                 dsplot(this); % Update plot
                 % Update selection
-                set(this.SelectorLines(1,:), 'XData', xd1/this.Fs);
+                % TODO: xd1 must be 2 values
+                set(this.SelectorLines(1,:), 'XData', [xd1 xd1]/this.Fs);
                 xd2 = xd1 + size(y,1);
-                set(this.SelectorLines(2,:), 'XData', xd2/this.Fs);
-                set(this.SelectorPatchHandle, 'XData', [xd1, xd2]/this.Fs);
+                set(this.SelectorLines(2,:), 'XData', [xd2 xd2]/this.Fs);
+                set(this.SelectorPatchHandle, 'XData', [[xd1 xd1], [xd2 xd2]]/this.Fs);
             else
                 helpdlg('Data needs to be selected for applying filter.', ...
                     'Audio Editor: help');
